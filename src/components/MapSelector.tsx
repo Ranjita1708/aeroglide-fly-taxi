@@ -184,15 +184,8 @@ const MapSelector = ({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           />
           <MapClickHandler onMapClick={handleMapClick} mode={mode} />
-          
-          {pickup && (
-            <Marker position={[pickup.lat, pickup.lng]} />
-          )}
-          
-          {destination && (
-            <Marker position={[destination.lat, destination.lng]} />
-          )}
-
+          {pickup && <Marker position={[pickup.lat, pickup.lng]} />}
+          {destination && <Marker position={[destination.lat, destination.lng]} />}
           {flightPath.length === 2 && (
             <Polyline
               positions={flightPath}

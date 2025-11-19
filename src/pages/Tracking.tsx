@@ -135,17 +135,9 @@ const Tracking = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           />
           <MapUpdater center={vehiclePosition} />
-          
-          {/* Pickup marker */}
           <Marker position={[pickup.lat, pickup.lng]} />
-          
-          {/* Destination marker */}
           <Marker position={[destination.lat, destination.lng]} />
-          
-          {/* Vehicle marker */}
           <Marker position={vehiclePosition} icon={planeIcon} />
-          
-          {/* Flight path */}
           <Polyline
             positions={flightPath}
             color="#0098ff"
