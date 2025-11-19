@@ -51,7 +51,7 @@ const BookRide = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
+        <div className={`grid lg:grid-cols-2 gap-8 max-w-7xl mx-auto ${showConfirmation ? 'pointer-events-none opacity-50' : ''}`}>
           {/* Map Section */}
           <div className="space-y-4">
             <div>
