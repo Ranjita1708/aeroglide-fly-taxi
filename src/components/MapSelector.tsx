@@ -54,7 +54,7 @@ const MapSelector = ({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<{ pickup?: L.Marker; destination?: L.Marker; path?: LeafletPolyline }>({});
 
-  // Initialize map
+  // Initialize map once
   useEffect(() => {
     if (mapRef.current || !mapContainerRef.current) return;
 
@@ -70,7 +70,15 @@ const MapSelector = ({
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    map.on("click", (e: LeafletMouseEvent) => {
+    mapRef.current = map;
+  }, []);
+
+  // Handle map clicks based on current mode
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const handleClick = (e: LeafletMouseEvent) => {
       if (!mode) return;
       const { lat, lng } = e.latlng;
       const location: Location = { lat, lng, address: `${lat.toFixed(4)}, ${lng.toFixed(4)}` };
@@ -82,9 +90,13 @@ const MapSelector = ({
         onDestinationChange(location);
         setMode(null);
       }
-    });
+    };
 
-    mapRef.current = map;
+    map.on("click", handleClick);
+
+    return () => {
+      map.off("click", handleClick);
+    };
   }, [mode, onDestinationChange, onPickupChange]);
 
   // Update markers and path when locations change
