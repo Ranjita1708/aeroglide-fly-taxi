@@ -22,8 +22,10 @@ export type Location = {
 type Props = {
   pickup: Location | null;
   destination: Location | null;
+  stops: Location[];
   onPickupChange: (location: Location) => void;
   onDestinationChange: (location: Location) => void;
+  onStopChange: (index: number, location: Location) => void;
   onDistanceCalculated: (distance: number) => void;
 };
 
@@ -45,16 +47,18 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const MapSelector = ({
   pickup,
   destination,
+  stops,
   onPickupChange,
   onDestinationChange,
+  onStopChange,
   onDistanceCalculated,
 }: Props) => {
-  const [mode, setMode] = useState<"pickup" | "destination" | null>(null);
+  const [mode, setMode] = useState<"pickup" | "destination" | "stop" | null>(null);
+  const [editingStopIndex, setEditingStopIndex] = useState<number | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const markersRef = useRef<{ pickup?: L.Marker; destination?: L.Marker; path?: LeafletPolyline }>({});
+  const markersRef = useRef<{ pickup?: L.Marker; destination?: L.Marker; path?: LeafletPolyline; stops: L.Marker[] }>({ stops: [] });
 
-  // Initialize map once
   useEffect(() => {
     if (mapRef.current || !mapContainerRef.current) return;
 
@@ -73,7 +77,14 @@ const MapSelector = ({
     mapRef.current = map;
   }, []);
 
-  // Handle map clicks based on current mode
+  useEffect(() => {
+    const newStopIndex = stops.findIndex(stop => stop.lat === 0 && stop.lng === 0);
+    if (newStopIndex !== -1) {
+      setMode("stop");
+      setEditingStopIndex(newStopIndex);
+    }
+  }, [stops]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -89,6 +100,10 @@ const MapSelector = ({
       } else if (mode === "destination") {
         onDestinationChange(location);
         setMode(null);
+      } else if (mode === "stop" && editingStopIndex !== null) {
+        onStopChange(editingStopIndex, location);
+        setMode(null);
+        setEditingStopIndex(null);
       }
     };
 
@@ -97,28 +112,19 @@ const MapSelector = ({
     return () => {
       map.off("click", handleClick);
     };
-  }, [mode, onDestinationChange, onPickupChange]);
+  }, [mode, onDestinationChange, onPickupChange, onStopChange, editingStopIndex]);
 
-  // Update markers and path when locations change
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const markers = markersRef.current;
 
-    // Clear existing markers
-    if (markers.pickup) {
-      markers.pickup.remove();
-      markers.pickup = undefined;
-    }
-    if (markers.destination) {
-      markers.destination.remove();
-      markers.destination = undefined;
-    }
-    if (markers.path) {
-      markers.path.remove();
-      markers.path = undefined;
-    }
+    if (markers.pickup) markers.pickup.remove();
+    if (markers.destination) markers.destination.remove();
+    if (markers.path) markers.path.remove();
+    markers.stops.forEach(marker => marker.remove());
+    markers.stops = [];
 
     const layerGroup = L.layerGroup().addTo(map);
 
@@ -130,11 +136,29 @@ const MapSelector = ({
       markers.destination = L.marker([destination.lat, destination.lng]).addTo(layerGroup);
     }
 
+    const validStops = stops.filter(stop => stop.lat !== 0 || stop.lng !== 0);
+
+    validStops.forEach(stop => {
+      const stopMarker = L.marker([stop.lat, stop.lng], {
+        icon: L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        })
+      }).addTo(layerGroup);
+      markers.stops.push(stopMarker);
+    });
+
     if (pickup && destination) {
       const pathLatLngs: LatLngExpression[] = [
         [pickup.lat, pickup.lng],
+        ...validStops.map(s => [s.lat, s.lng] as LatLngExpression),
         [destination.lat, destination.lng],
       ];
+
       markers.path = L.polyline(pathLatLngs, {
         color: "#0098ff",
         weight: 3,
@@ -142,17 +166,23 @@ const MapSelector = ({
         dashArray: "10, 10",
       }).addTo(layerGroup);
 
-      const dist = calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng);
-      onDistanceCalculated(dist);
+      let totalDistance = 0;
+      for (let i = 0; i < pathLatLngs.length - 1; i++) {
+        const p1 = pathLatLngs[i] as [number, number];
+        const p2 = pathLatLngs[i+1] as [number, number];
+        totalDistance += calculateDistance(p1[0], p1[1], p2[0], p2[1]);
+      }
+      onDistanceCalculated(totalDistance);
 
-      // Fit bounds to path
-      map.fitBounds(markers.path.getBounds(), { padding: [40, 40] });
+      if (markers.path) {
+        map.fitBounds(markers.path.getBounds(), { padding: [40, 40] });
+      }
     }
 
     return () => {
       layerGroup.remove();
     };
-  }, [pickup, destination, onDistanceCalculated]);
+  }, [pickup, destination, stops, onDistanceCalculated]);
 
   const handleCurrentLocation = () => {
     if (!navigator.geolocation) return;
@@ -177,10 +207,7 @@ const MapSelector = ({
     );
   };
 
-  const distanceDisplay =
-    pickup && destination
-      ? calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng)
-      : null;
+  const distanceDisplay = pickup && destination ? calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng) : null;
 
   return (
     <div className="space-y-4">
@@ -216,7 +243,7 @@ const MapSelector = ({
 
         {mode && (
           <p className="text-sm text-muted-foreground text-center">
-            Tap on the map to set {mode === "pickup" ? "pickup" : "destination"} point
+            Tap on the map to set {mode === 'stop' ? `stop ${editingStopIndex !== null ? editingStopIndex + 1 : ''}`: mode} point
           </p>
         )}
 

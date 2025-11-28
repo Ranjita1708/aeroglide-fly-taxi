@@ -21,6 +21,7 @@ type TierType = "standard" | "premium";
 type Props = {
   pickup: Location;
   destination: Location;
+  stops: Location[];
   tier: TierType;
   distance: number;
   onConfirm: () => void;
@@ -36,6 +37,7 @@ const TIER_MULTIPLIERS = {
 const BookingConfirmation = ({
   pickup,
   destination,
+  stops,
   tier,
   distance,
   onConfirm,
@@ -68,6 +70,18 @@ const BookingConfirmation = ({
                 </p>
               </div>
             </div>
+
+            {stops.map((stop, index) => (
+              <div key={index} className="flex items-start gap-3 pl-4 border-l-2 border-dashed ml-2.5">
+                <MapPin className="h-5 w-5 text-yellow-500 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Stop {index + 1}</p>
+                  <p className="font-medium">
+                    {stop.address || `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}`}
+                  </p>
+                </div>
+              </div>
+            ))}
             
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-destructive mt-0.5" />
